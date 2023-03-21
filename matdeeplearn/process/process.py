@@ -11,7 +11,7 @@ from ase import io
 from scipy.stats import rankdata
 from scipy import interpolate
 
-##torch imports
+
 import torch
 import torch.nn.functional as F
 from torch_geometric.data import DataLoader, Dataset, Data, InMemoryDataset
@@ -623,7 +623,7 @@ def get_dictionary(dictionary_file):
     return atom_dictionary
 
 
-##Deletes unnecessary data due to slow dataloader
+# Deletes unnecessary data due to slow dataLoader
 def Cleanup(data_list, entries):
     for data in data_list:
         for entry in entries:
@@ -701,7 +701,7 @@ def SM_Edge(dataset):
 #  Transforms
 ################################################################################
 
-##Get specified y index from data.y
+# Get specified y index from data.y
 class GetY(object):
     def __init__(self, index=0):
         self.index = index

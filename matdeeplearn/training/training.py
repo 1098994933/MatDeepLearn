@@ -9,7 +9,7 @@ import numpy as np
 from functools import partial
 import platform
 
-##Torch imports
+# Torch imports
 import torch.nn.functional as F
 import torch
 from torch_geometric.data import DataLoader, Dataset
@@ -55,7 +55,7 @@ def train(model, optimizer, loader, loss_method, rank):
     return loss_all
 
 
-##Evaluation step, runs model in eval mode
+# Evaluation step, runs model in eval mode
 def evaluate(loader, model, loss_method, rank, out=False):
     model.eval()
     loss_all = 0
@@ -93,7 +93,6 @@ def evaluate(loader, model, loss_method, rank, out=False):
         return loss_all
 
 
-##Model trainer
 def trainer(
         rank,
         world_size,
@@ -108,23 +107,39 @@ def trainer(
         verbosity,
         filename="my_model_temp.pth",
 ):
+    """
+    Model training with optimizer
+    :param rank:
+    :param world_size:
+    :param model:
+    :param optimizer:
+    :param scheduler:
+    :param loss:
+    :param train_loader:
+    :param val_loader:
+    :param train_sampler:
+    :param epochs:
+    :param verbosity:
+    :param filename:
+    :return:
+    """
     train_error = val_error = test_error = epoch_time = float("NaN")
     train_start = time.time()
     best_val_error = 1e10
     model_best = model
-    ##Start training over epochs loop
+    # Start training over epochs loop
     for epoch in range(1, epochs + 1):
 
         lr = scheduler.optimizer.param_groups[0]["lr"]
         if rank not in ("cpu", "cuda"):
             train_sampler.set_epoch(epoch)
-        ##Train model
+        # Train model
         train_error = train(model, optimizer, train_loader, loss, rank=rank)
         if rank not in ("cpu", "cuda"):
             torch.distributed.reduce(train_error, dst=0)
             train_error = train_error / world_size
 
-        ##Get validation performance
+        # Get validation performance
         if rank not in ("cpu", "cuda"):
             dist.barrier()
         if val_loader != None and rank in (0, "cpu", "cuda"):
@@ -135,11 +150,11 @@ def trainer(
             else:
                 val_error = evaluate(val_loader, model, loss, rank=rank, out=False)
 
-        ##Train loop timings
+        # Train loop timings
         epoch_time = time.time() - train_start
         train_start = time.time()
 
-        ##remember the best val error and save model and checkpoint        
+        # remember the best val error and save model and checkpoint
         if val_loader != None and rank in (0, "cpu", "cuda"):
             if val_error == float("NaN") or val_error < best_val_error:
                 if rank not in ("cpu", "cuda"):
@@ -189,10 +204,10 @@ def trainer(
                     filename,
                 )
 
-        ##scheduler on train error
+        # scheduler on train error
         scheduler.step(train_error)
 
-        ##Print performance
+        # Print performance
         if epoch % verbosity == 0:
             if rank in (0, "cpu", "cuda"):
                 print(
@@ -378,7 +393,7 @@ def loader_setup_CV(index, batch_size, dataset, rank, world_size=0, num_workers=
 #  Trainers
 ################################################################################
 
-###Regular training with train, val, test split
+
 def train_regular(
         rank,
         world_size,
@@ -387,19 +402,29 @@ def train_regular(
         training_parameters=None,
         model_parameters=None,
 ):
-    ##DDP
+    """
+    training a model Regular training with train, val, test split
+    :param rank: cpu or cuda
+    :param world_size:
+    :param data_path:
+    :param job_parameters:
+    :param training_parameters:
+    :param model_parameters:
+    :return:
+    """
+    # distributed Data Parallelism (DDP)
     ddp_setup(rank, world_size)
-    ##some issues with DDP learning rate
+    # some issues with DDP learning rate
     if rank not in ("cpu", "cuda"):
         model_parameters["lr"] = model_parameters["lr"] * world_size
 
-    ##Get dataset
+    # Get dataset
     dataset = process.get_dataset(data_path, training_parameters["target_index"], False)
 
     if rank not in ("cpu", "cuda"):
         dist.barrier()
 
-    ##Set up loader
+    # Set up dataLoader
     (
         train_loader,
         val_loader,
@@ -419,7 +444,7 @@ def train_regular(
         world_size,
     )
 
-    ##Set up model
+    # Set up model
     model = model_setup(
         rank,
         model_parameters["model"],
@@ -430,7 +455,7 @@ def train_regular(
         model_parameters.get("print_model", True),
     )
 
-    ##Set-up optimizer & scheduler
+    # Set-up optimizer & scheduler
     optimizer = getattr(torch.optim, model_parameters["optimizer"])(
         model.parameters(),
         lr=model_parameters["lr"],
@@ -440,7 +465,7 @@ def train_regular(
         optimizer, **model_parameters["scheduler_args"]
     )
 
-    # Start training model
+    # Start training model with epochs
     model = trainer(
         rank,
         world_size,
@@ -455,8 +480,8 @@ def train_regular(
         training_parameters["verbosity"],
         "my_model_temp.pth",
     )
-
-    if rank in (0, "cpu", "cuda"):
+    # model evaluation
+    if rank in (0, "cpu", "cuda"):  # 0 is DDP
 
         train_error = val_error = test_error = float("NaN")
 
@@ -476,14 +501,14 @@ def train_regular(
         )
         print("Train Error: {:.5f}".format(train_error))
 
-        ##Get val error
+        # Get val error
         if val_loader != None:
             val_error, val_out = evaluate(
                 val_loader, model, training_parameters["loss"], rank, out=True
             )
             print("Val Error: {:.5f}".format(val_error))
 
-        ##Get test error
+        # Get test error
         if test_loader != None:
             test_error, test_out = evaluate(
                 test_loader, model, training_parameters["loss"], rank, out=True
@@ -1071,7 +1096,7 @@ def tune_setup(
     return best_trial
 
 
-###Simple ensemble using averages
+# Simple ensemble using averages
 def train_ensemble(
         data_path,
         job_parameters=None,
@@ -1085,7 +1110,7 @@ def train_ensemble(
     job_parameters["write_error"] = "True"
     job_parameters["write_output"] = "True"
     job_parameters["load_model"] = "False"
-    ##Loop over number of repeated trials
+    # Loop over number of repeated trials
     for i in range(0, len(job_parameters["ensemble_list"])):
         job_parameters["job_name"] = job_name + str(i)
         job_parameters["model_path"] = (
@@ -1128,7 +1153,7 @@ def train_ensemble(
                     model_parameters[job_parameters["ensemble_list"][i]],
                 )
 
-    ##Compile error metrics from individual models
+    # Compile error metrics from individual models
     print("Individual training finished.")
     print("Compiling metrics from individual models...")
     error_values = np.zeros((len(job_parameters["ensemble_list"]), 3))
@@ -1146,7 +1171,7 @@ def train_ensemble(
         np.std(error_values[:, 2]),
     ]
 
-    # average ensembling, takes the mean of the predictions
+    # average ensemble, takes the mean of the predictions
     for i in range(0, len(job_parameters["ensemble_list"])):
         filename = job_name + str(i) + "_test_outputs.csv"
         test_out = np.genfromtxt(filename, delimiter=",", skip_header=1)
@@ -1162,7 +1187,7 @@ def train_ensemble(
     )
     test_total = np.column_stack((test_total, ensemble_test))
 
-    ##Print performance
+    # Print performance
     for i in range(0, len(job_parameters["ensemble_list"])):
         print(
             job_parameters["ensemble_list"][i]
@@ -1201,7 +1226,7 @@ def train_ensemble(
             os.remove(filename)
 
 
-# Obtains features from graph in a trained model and analysis with tsne
+# Obtains features from graph in a trained model and analysis with t-sne
 def analysis(
         dataset,
         model_path,

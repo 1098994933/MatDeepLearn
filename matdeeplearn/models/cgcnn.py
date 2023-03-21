@@ -157,7 +157,6 @@ class CGCNN(torch.nn.Module):
                     out = self.bn_list[i](out)
                 else:
                     out = self.conv_list[i](out, data.edge_index, data.edge_attr)
-                    # out = getattr(F, self.act)(out)
             out = F.dropout(out, p=self.dropout_rate, training=self.training)
 
         # Post-GNN fc layers

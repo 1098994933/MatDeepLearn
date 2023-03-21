@@ -35,7 +35,7 @@ def main():
     )
 
     parser = argparse.ArgumentParser(description="MatDeepLearn inputs")
-    ###Job arguments
+    # Job arguments
     parser.add_argument(
         "--config_path",
         default="config.yml",
@@ -102,7 +102,7 @@ def main():
         type=str,
         help="Reprocess data since last run",
     )
-    ###Processing arguments
+    # Processing arguments
     parser.add_argument(
         "--data_path",
         default=None,
@@ -110,7 +110,7 @@ def main():
         help="Location of data containing structures (json or any other valid format) and accompanying files",
     )
     parser.add_argument("--format", default=None, type=str, help="format of input data")
-    ###Training arguments
+    # Training arguments
     parser.add_argument("--train_ratio", default=None, type=float, help="train ratio")
     parser.add_argument(
         "--val_ratio", default=None, type=float, help="validation ratio"
