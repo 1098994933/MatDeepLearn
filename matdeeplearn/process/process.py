@@ -23,15 +23,22 @@ from torch_geometric.utils import degree
 # Data splitting
 ################################################################################
 
-##basic train, val, test split
 def split_data(
     dataset,
     train_ratio,
     val_ratio,
     test_ratio,
-    seed=np.random.randint(1, 1e6),
-    save=False,
+    seed=np.random.randint(1, 1e6)
 ):
+    """
+    split train, val, test split
+    :param dataset:
+    :param train_ratio:
+    :param val_ratio:
+    :param test_ratio:
+    :param seed:
+    :return:
+    """
     dataset_size = len(dataset)
     if (train_ratio + val_ratio + test_ratio) <= 1:
         train_length = int(dataset_size * train_ratio)
@@ -605,8 +612,12 @@ def OneHotDegree(data, max_degree, in_degree=False, cat=True):
     return data
 
 
-##Obtain dictionary file for elemental features
 def get_dictionary(dictionary_file):
+    """
+    Obtain dictionary file for elemental features
+    :param dictionary_file:
+    :return:
+    """
     with open(dictionary_file) as f:
         atom_dictionary = json.load(f)
     return atom_dictionary
@@ -649,8 +660,7 @@ def NormalizeEdge(dataset, descriptor_label):
 
     for data in dataset:
         data.edge_descriptor[descriptor_label] = (
-            data.edge_descriptor[descriptor_label] - feature_min
-        ) / (feature_max - feature_min)
+            data.edge_descriptor[descriptor_label] - feature_min) / (feature_max - feature_min)
 
 
 # WIP

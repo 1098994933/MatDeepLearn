@@ -26,6 +26,7 @@ import matdeeplearn.process as process
 import matdeeplearn.training as training
 from matdeeplearn.models.utils import model_summary
 
+
 ################################################################################
 #  Training functions
 ################################################################################
@@ -94,20 +95,19 @@ def evaluate(loader, model, loss_method, rank, out=False):
 
 ##Model trainer
 def trainer(
-    rank,
-    world_size,
-    model,
-    optimizer,
-    scheduler,
-    loss,
-    train_loader,
-    val_loader,
-    train_sampler,
-    epochs,
-    verbosity,
-    filename = "my_model_temp.pth",
+        rank,
+        world_size,
+        model,
+        optimizer,
+        scheduler,
+        loss,
+        train_loader,
+        val_loader,
+        train_sampler,
+        epochs,
+        verbosity,
+        filename="my_model_temp.pth",
 ):
-
     train_error = val_error = test_error = epoch_time = float("NaN")
     train_start = time.time()
     best_val_error = 1e10
@@ -207,8 +207,13 @@ def trainer(
     return model_best
 
 
-##Write results to csv file
 def write_results(output, filename):
+    """
+    Write results to csv file
+    :param output:
+    :param filename:
+    :return:
+    """
     shape = output.shape
     with open(filename, "w") as f:
         csvwriter = csv.writer(f)
@@ -230,7 +235,7 @@ def ddp_setup(rank, world_size):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
     if platform.system() == 'Windows':
-        dist.init_process_group("gloo", rank=rank, world_size=world_size)    
+        dist.init_process_group("gloo", rank=rank, world_size=world_size)
     else:
         dist.init_process_group("nccl", rank=rank, world_size=world_size)
     torch.backends.cudnn.enabled = False
@@ -239,13 +244,13 @@ def ddp_setup(rank, world_size):
 
 ##Pytorch model setup
 def model_setup(
-    rank,
-    model_name,
-    model_params,
-    dataset,
-    load_model=False,
-    model_path=None,
-    print_model=True,
+        rank,
+        model_name,
+        model_params,
+        dataset,
+        load_model=False,
+        model_path=None,
+        print_model=True,
 ):
     model = getattr(models, model_name)(
         data=dataset, **(model_params if model_params is not None else {})
@@ -272,17 +277,17 @@ def model_setup(
 
 ##Pytorch loader setup
 def loader_setup(
-    train_ratio,
-    val_ratio,
-    test_ratio,
-    batch_size,
-    dataset,
-    rank,
-    seed,
-    world_size=0,
-    num_workers=0,
+        train_ratio,
+        val_ratio,
+        test_ratio,
+        batch_size,
+        dataset,
+        rank,
+        seed,
+        world_size=0,
+        num_workers=0,
 ):
-    ##Split datasets
+    # Split dataset
     train_dataset, val_dataset, test_dataset = process.split_data(
         dataset, train_ratio, val_ratio, test_ratio, seed
     )
@@ -295,7 +300,7 @@ def loader_setup(
     elif rank in ("cpu", "cuda"):
         train_sampler = None
 
-    ##Load data
+    # Load data
     train_loader = val_loader = test_loader = None
     train_loader = DataLoader(
         train_dataset,
@@ -335,7 +340,7 @@ def loader_setup(
 
 
 def loader_setup_CV(index, batch_size, dataset, rank, world_size=0, num_workers=0):
-    ##Split datasets
+    # Split dataset
     train_dataset = [x for i, x in enumerate(dataset) if i != index]
     train_dataset = torch.utils.data.ConcatDataset(train_dataset)
     test_dataset = dataset[index]
@@ -375,12 +380,12 @@ def loader_setup_CV(index, batch_size, dataset, rank, world_size=0, num_workers=
 
 ###Regular training with train, val, test split
 def train_regular(
-    rank,
-    world_size,
-    data_path,
-    job_parameters=None,
-    training_parameters=None,
-    model_parameters=None,
+        rank,
+        world_size,
+        data_path,
+        job_parameters=None,
+        training_parameters=None,
+        model_parameters=None,
 ):
     ##DDP
     ddp_setup(rank, world_size)
@@ -435,7 +440,7 @@ def train_regular(
         optimizer, **model_parameters["scheduler_args"]
     )
 
-    ##Start training
+    # Start training model
     model = trainer(
         rank,
         world_size,
@@ -485,7 +490,7 @@ def train_regular(
             )
             print("Test Error: {:.5f}".format(test_error))
 
-        ##Save model
+        # Save model
         if job_parameters["save_model"] == "True":
 
             if rank not in ("cpu", "cuda"):
@@ -509,7 +514,7 @@ def train_regular(
                     job_parameters["model_path"],
                 )
 
-        ##Write outputs
+        # Write outputs
         if job_parameters["write_output"] == "True":
 
             write_results(
@@ -527,7 +532,7 @@ def train_regular(
         if rank not in ("cpu", "cuda"):
             dist.destroy_process_group()
 
-        ##Write out model performance to file
+        # Write out model performance to file
         error_values = np.array((train_error.cpu(), val_error.cpu(), test_error.cpu()))
         if job_parameters.get("write_error") == "True":
             np.savetxt(
@@ -539,9 +544,14 @@ def train_regular(
         return error_values
 
 
-###Predict using a saved movel
 def predict(dataset, loss, job_parameters=None):
-
+    """
+    # Predict using a saved model
+    :param dataset:
+    :param loss:
+    :param job_parameters:
+    :return:
+    """
     rank = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ##Loads predict dataset in one go, care needed for large datasets)
@@ -567,14 +577,14 @@ def predict(dataset, loss, job_parameters=None):
     model = model.to(rank)
     model_summary(model)
 
-    ##Get predictions
+    # Get predictions
     time_start = time.time()
     test_error, test_out = evaluate(loader, model, loss, rank, out=True)
     elapsed_time = time.time() - time_start
 
     print("Evaluation time (s): {:.5f}".format(elapsed_time))
 
-    ##Write output
+    # Write output
     if job_parameters["write_output"] == "True":
         write_results(
             test_out, str(job_parameters["job_name"]) + "_predicted_outputs.csv"
@@ -583,16 +593,15 @@ def predict(dataset, loss, job_parameters=None):
     return test_error
 
 
-###n-fold cross validation
+# n-fold cross validation
 def train_CV(
-    rank,
-    world_size,
-    data_path,
-    job_parameters=None,
-    training_parameters=None,
-    model_parameters=None,
+        rank,
+        world_size,
+        data_path,
+        job_parameters=None,
+        training_parameters=None,
+        model_parameters=None,
 ):
-
     job_parameters["load_model"] = "False"
     job_parameters["save_model"] = "False"
     job_parameters["model_path"] = None
@@ -717,12 +726,11 @@ def train_CV(
 
 ### Repeat training for n times
 def train_repeat(
-    data_path,
-    job_parameters=None,
-    training_parameters=None,
-    model_parameters=None,
+        data_path,
+        job_parameters=None,
+        training_parameters=None,
+        model_parameters=None,
 ):
-
     world_size = torch.cuda.device_count()
     job_name = job_parameters["job_name"]
     model_path = job_parameters["model_path"]
@@ -843,14 +851,13 @@ def train_repeat(
             os.remove(filename)
 
 
-###Hyperparameter optimization
+# Hyper-parameter optimization
 # trainable function for ray tune (no parallel, max 1 GPU per job)
 def tune_trainable(config, checkpoint_dir=None, data_path=None):
-
     # imports
     from ray import tune
 
-    print("Hyperparameter trial start")
+    print("Hyper-parameter trial start")
     hyper_args = config["hyper_args"]
     job_parameters = config["job_parameters"]
     processing_parameters = config["processing_parameters"]
@@ -888,7 +895,7 @@ def tune_trainable(config, checkpoint_dir=None, data_path=None):
         processing_parameters,
     )
 
-    ##Set up loader
+    # Set up loader
     (
         train_loader,
         val_loader,
@@ -952,8 +959,8 @@ def tune_trainable(config, checkpoint_dir=None, data_path=None):
         ##Delete processed data
         if epoch == model_parameters["epochs"]:
             if (
-                job_parameters["reprocess"] == "True"
-                and job_parameters["hyper_delete_processed"] == "True"
+                    job_parameters["reprocess"] == "True"
+                    and job_parameters["hyper_delete_processed"] == "True"
             ):
                 shutil.rmtree(
                     os.path.join(data_path, processing_parameters["processed_path"])
@@ -979,13 +986,12 @@ def tune_trainable(config, checkpoint_dir=None, data_path=None):
 
 # Tune setup
 def tune_setup(
-    hyper_args,
-    job_parameters,
-    processing_parameters,
-    training_parameters,
-    model_parameters,
+        hyper_args,
+        job_parameters,
+        processing_parameters,
+        training_parameters,
+        model_parameters,
 ):
-
     # imports
     import ray
     from ray import tune
@@ -1000,15 +1006,15 @@ def tune_setup(
     # currently no support for paralleization per trial
     gpus_per_trial = 1
 
-    ##Set up search algo
+    # Set up search algo
     search_algo = HyperOptSearch(metric="loss", mode="min", n_initial_points=5)
     search_algo = ConcurrencyLimiter(
         search_algo, max_concurrent=job_parameters["hyper_concurrency"]
     )
 
-    ##Resume run
+    # Resume run
     if os.path.exists(local_dir + "/" + job_parameters["job_name"]) and os.path.isdir(
-        local_dir + "/" + job_parameters["job_name"]
+            local_dir + "/" + job_parameters["job_name"]
     ):
         if job_parameters["hyper_resume"] == "False":
             resume = False
@@ -1019,7 +1025,7 @@ def tune_setup(
     else:
         resume = False
 
-    ##Print out hyperparameters
+    # Print out hyperparameters
     parameter_columns = [
         element for element in hyper_args.keys() if element not in "global"
     ]
@@ -1028,7 +1034,7 @@ def tune_setup(
         max_progress_rows=20, max_error_rows=5, parameter_columns=parameter_columns
     )
 
-    ##Run tune
+    # Run tune
     tune_result = tune.run(
         partial(tune_trainable, data_path=data_path),
         resources_per_trial={"cpu": 1, "gpu": gpus_per_trial},
@@ -1054,7 +1060,7 @@ def tune_setup(
         # checkpoint_score_attr="min-loss",
         stop={
             "training_iteration": model_parameters["epochs"]
-            // job_parameters["hyper_iter"]
+                                  // job_parameters["hyper_iter"]
         },
     )
 
@@ -1067,12 +1073,11 @@ def tune_setup(
 
 ###Simple ensemble using averages
 def train_ensemble(
-    data_path,
-    job_parameters=None,
-    training_parameters=None,
-    model_parameters=None,
+        data_path,
+        job_parameters=None,
+        training_parameters=None,
+        model_parameters=None,
 ):
-
     world_size = torch.cuda.device_count()
     job_name = job_parameters["job_name"]
     write_output = job_parameters["write_output"]
@@ -1084,7 +1089,7 @@ def train_ensemble(
     for i in range(0, len(job_parameters["ensemble_list"])):
         job_parameters["job_name"] = job_name + str(i)
         job_parameters["model_path"] = (
-            str(i) + "_" + job_parameters["ensemble_list"][i] + "_" + model_path
+                str(i) + "_" + job_parameters["ensemble_list"][i] + "_" + model_path
         )
 
         if world_size == 0:
@@ -1156,7 +1161,7 @@ def train_ensemble(
         torch.tensor(test_total[:, 1].astype(np.float)),
     )
     test_total = np.column_stack((test_total, ensemble_test))
-    
+
     ##Print performance
     for i in range(0, len(job_parameters["ensemble_list"])):
         print(
@@ -1169,11 +1174,11 @@ def train_ensemble(
         )
     )
     print("Ensemble Error: {:.5f}".format(ensemble_test_error))
-    
-    ##Write output
+
+    # Write output
     if write_output == "True" or write_output == "Partial":
         with open(
-            str(job_name) + "_test_ensemble_outputs.csv", "w"
+                str(job_name) + "_test_ensemble_outputs.csv", "w"
         ) as f:
             csvwriter = csv.writer(f)
             for i in range(0, len(test_total) + 1):
@@ -1195,15 +1200,13 @@ def train_ensemble(
             filename = job_name + str(i) + "_test_outputs.csv"
             os.remove(filename)
 
-##Obtains features from graph in a trained model and analysis with tsne
-def analysis(
-    dataset,
-    model_path,
-    tsne_args,
-):
 
-    # imports
-    from sklearn.decomposition import PCA
+# Obtains features from graph in a trained model and analysis with tsne
+def analysis(
+        dataset,
+        model_path,
+        tsne_args,
+):
     from sklearn.manifold import TSNE
     import matplotlib.pyplot as plt
 
@@ -1233,7 +1236,7 @@ def analysis(
     )
 
     model.eval()
-    ##Grabs the input of the first linear layer after the GNN
+    # Grabs the input of the first linear layer after the GNN
     model.post_lin_list[0].register_forward_hook(hook)
     for data in loader:
         with torch.no_grad():
@@ -1258,7 +1261,7 @@ def analysis(
     # plt.show()
     # plt.clf()
 
-    ##Start t-SNE analysis
+    # Start t-SNE analysis
     tsne = TSNE(**tsne_args)
     tsne_out = tsne.fit_transform(inputs)
     rows = zip(
